@@ -1,0 +1,1 @@
+Packer launches a temporary EC2 instance, provisions it, snapshots it into an AMI, and then destroys the instance.
