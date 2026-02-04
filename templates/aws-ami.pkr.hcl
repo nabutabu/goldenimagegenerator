@@ -4,8 +4,14 @@ packer {
       version = ">= 1.2.8"
       source  = "github.com/hashicorp/amazon"
     }
+    git = {
+      version = ">= 0.6.2"
+      source  = "github.com/ethanmdavidson/git"
+    }
   }
 }
+
+data "git-commit" "test" {}
 
 variable "aws_access_key" {
   type        = string
@@ -19,8 +25,12 @@ variable "aws_secret_key" {
   sensitive   = true
 }
 
+locals {
+  hash = data.git-commit.test.hash
+}
+
 source "amazon-ebs" "ubuntu" {
-  ami_name      = "crane-golden-linux-aws-2"
+  ami_name      = "crane-golden-linux-aws-curl-${formatdate("YYYY-MM-DD-hhmm", timestamp())}"
   instance_type = "t4g.micro"
   region        = "us-west-2"
   access_key    = var.aws_access_key
@@ -35,6 +45,12 @@ source "amazon-ebs" "ubuntu" {
     owners      = ["099720109477"]
   }
   ssh_username = "ubuntu"
+  tags = {
+    OS_Version = "Ubuntu"
+    Git_SHA    = local.hash
+    TimeStamp  = formatdate("YYYY-MM-DD-hhmm", timestamp())
+    Role       = "MicroWeb"
+  }
 }
 
 build {
@@ -42,4 +58,16 @@ build {
   sources = [
     "source.amazon-ebs.ubuntu"
   ]
+  provisioner "shell" {
+    inline = ["sudo apt-get update", "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl"]
+  }
+  provisioner "shell" {
+    script = "${path.root}/setup_k8s.sh"
+  }
+  provisioner "shell" {
+    inline = [
+      "sudo apt-get clean",
+      "sudo rm -rf /var/lib/apt/lists/*"
+    ]
+  }
 }
